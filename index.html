@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koordinaten Filter Box</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #1a1f2e;
+    color: #e8eaf0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: #12161f;
+    border-bottom: 1px solid #2a3148;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  header .logo {
+    width: 30px; height: 30px;
+    background: #e8542a;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; color: white;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 15px; font-weight: 600; color: #e8eaf0; }
+  header span { font-size: 12px; color: #6b7494; margin-left: 4px; }
+
+  .layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    height: calc(100vh - 55px);
+  }
+
+  /* ── MAP COLUMN ── */
+  .map-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+  }
+
+  .radius-bar {
+    background: #12161f;
+    border-bottom: 1px solid #2a3148;
+    padding: 9px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .radius-bar .r-label {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: #6b7494; white-space: nowrap;
+  }
+  .radius-presets { display: flex; gap: 5px; flex-wrap: wrap; }
+  .preset-btn {
+    padding: 4px 10px; font-size: 12px;
+    border: 1px solid #2a3148; border-radius: 20px;
+    background: #1a1f2e; color: #9ba3c0;
+    cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
+  }
+  .preset-btn:hover { border-color: #e8542a; color: #e8eaf0; }
+  .preset-btn.active { background: #e8542a; border-color: #e8542a; color: white; font-weight: 600; }
+
+  .slider-wrap { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 120px; }
+  .slider-wrap .sl-end { font-size: 10px; color: #4a5270; white-space: nowrap; }
+
+  input[type="range"] {
+    flex: 1; -webkit-appearance: none;
+    height: 4px; background: #2a3148; border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: #e8542a; cursor: pointer;
+    border: 2px solid #12161f; box-shadow: 0 0 0 1px #e8542a;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #e8542a; cursor: pointer; border: 2px solid #12161f;
+  }
+  .radius-value-display {
+    font-size: 15px; font-weight: 700; color: #e8542a;
+    min-width: 68px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+
+  #map { flex: 1; background: #0d1117; cursor: crosshair; }
+
+  .map-hint-overlay {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(18,22,31,0.88); border: 1px solid #2a3148;
+    border-radius: 8px; padding: 10px 20px;
+    font-size: 13px; color: #9ba3c0;
+    pointer-events: none; z-index: 1000; white-space: nowrap; transition: opacity 0.4s;
+  }
+  .map-hint-overlay.hidden { opacity: 0; }
+
+  .coord-status {
+    background: #12161f; border-top: 1px solid #2a3148;
+    padding: 6px 16px; font-size: 12px; color: #6b7494;
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  }
+  .coord-status .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #3a4060; flex-shrink: 0; transition: background 0.3s;
+  }
+  .coord-status .dot.active { background: #5db83a; }
+  .coord-status .coords-text { font-variant-numeric: tabular-nums; color: #9ba3c0; }
+
+  .manual-input-bar {
+    background: #12161f; border-top: 1px solid #2a3148;
+    padding: 9px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  }
+  .manual-input-bar .m-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: #4a5270; white-space: nowrap;
+  }
+  .manual-input-bar input[type="text"] {
+    flex: 1; background: #1a1f2e; border: 1px solid #2a3148;
+    border-radius: 6px; padding: 8px 12px; font-size: 13px;
+    color: #e8eaf0; outline: none; transition: border-color 0.15s; font-family: inherit;
+  }
+  .manual-input-bar input[type="text"]:focus { border-color: #e8542a; }
+  .manual-input-bar input::placeholder { color: #3a4060; }
+  .btn-parse {
+    background: #e8542a; color: white; border: none; border-radius: 6px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background 0.15s; font-family: inherit; white-space: nowrap; flex-shrink: 0;
+  }
+  .btn-parse:hover { background: #d4481e; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 390px; flex-shrink: 0; background: #12161f;
+    border-left: 1px solid #2a3148; display: flex;
+    flex-direction: column; overflow-y: auto;
+  }
+
+  .section { padding: 16px 18px; border-bottom: 1px solid #1e2436; }
+  .section-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #6b7494; margin-bottom: 12px;
+  }
+  .status-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: #3a4060; margin-right: 6px; vertical-align: middle; transition: background 0.3s;
+  }
+  .status-dot.active { background: #5db83a; }
+
+  .map-layer-row { display: flex; gap: 6px; }
+  .layer-btn {
+    flex: 1; padding: 7px 6px; font-size: 12px; border: 1px solid #2a3148;
+    border-radius: 6px; background: #1a1f2e; color: #9ba3c0; cursor: pointer;
+    text-align: center; transition: all 0.15s; font-family: inherit;
+  }
+  .layer-btn.active { background: #1e2a3a; border-color: #378add; color: #7fc0f5; }
+
+  /* ── DiBa Panel ── */
+  .diba-panel {
+    background: #f5f6f9;
+    border: 2px solid #c8cdd8;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .diba-panel-header {
+    background: #e8eaf0;
+    border-bottom: 2px solid #c8cdd8;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+
+  /* The funnel icon container — exact DiBa blue square like the PNG */
+  .funnel-icon-wrap {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    background: #0e4d8f;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .diba-badge {
+    background: #1a6fbb;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .diba-title-text {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1a2a40;
+    letter-spacing: 0.01em;
+  }
+
+  /* Filter rows */
+  .filter-rows { display: flex; flex-direction: column; gap: 0; }
+
+  .filter-group-sep {
+    background: #dde0e8;
+    padding: 4px 12px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #7a8599;
+    border-top: 1px solid #c8cdd8;
+  }
+  .filter-group-sep:first-child { border-top: none; }
+
+  .filter-row {
+    display: flex;
+    align-items: stretch;
+    background: #ffffff;
+    border-top: 1px solid #dde0e8;
+    height: 38px;
+  }
+
+  .filter-row .field-name {
+    width: 92px;
+    flex-shrink: 0;
+    padding: 0 10px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #333;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-right: 1px solid #dde0e8;
+    background: #f0f2f6;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .filter-row .operator {
+    width: 106px;
+    flex-shrink: 0;
+    padding: 0 8px;
+    font-size: 11px;
+    color: #555;
+    border-right: 1px solid #dde0e8;
+    background: #f8f9fb;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .filter-row .coord-value {
+    flex: 1;
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #111;
+    font-family: 'Consolas', 'Menlo', 'Courier New', monospace;
+    font-variant-numeric: tabular-nums;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .filter-row .coord-value.empty {
+    color: #bbb;
+    font-weight: 400;
+    font-size: 11px;
+    font-family: inherit;
+  }
+
+  .filter-row .btn-copy {
+    flex-shrink: 0;
+    background: #eef2f8;
+    border: none;
+    border-left: 1px solid #dde0e8;
+    padding: 0 12px;
+    font-size: 11px;
+    color: #1a6fbb;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-family: inherit;
+    font-weight: 700;
+  }
+  .filter-row .btn-copy:hover { background: #dce6f5; color: #0d4e8a; }
+  .filter-row .btn-copy.copied { background: #eaf5e8; color: #2f7a18; }
+
+  @media (max-width: 780px) {
+    .layout { flex-direction: column; height: auto; }
+    .sidebar { width: 100%; border-left: none; border-top: 1px solid #2a3148; }
+    #map { height: 340px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">S</div>
+  <h1>Koordinaten Filter Box <span>— Bounding Box Rechner</span></h1>
+</header>
+
+<div class="layout">
+
+  <!-- MAP COLUMN -->
+  <div class="map-column">
+
+    <div class="radius-bar">
+      <div class="r-label">Radius</div>
+      <div class="radius-presets">
+        <button class="preset-btn" onclick="setRadius(10)">10 m</button>
+        <button class="preset-btn" onclick="setRadius(50)">50 m</button>
+        <button class="preset-btn" onclick="setRadius(100)">100 m</button>
+        <button class="preset-btn" onclick="setRadius(250)">250 m</button>
+        <button class="preset-btn" onclick="setRadius(500)">500 m</button>
+        <button class="preset-btn" onclick="setRadius(1000)">1 km</button>
+        <button class="preset-btn" onclick="setRadius(2500)">2,5 km</button>
+        <button class="preset-btn" onclick="setRadius(5000)">5 km</button>
+        <button class="preset-btn active" onclick="setRadius(10000)">10 km</button>
+      </div>
+      <div class="slider-wrap">
+        <span class="sl-end">10 m</span>
+        <input type="range" id="radius-slider" min="0" max="100" value="100" oninput="onSliderChange(this.value)"/>
+        <span class="sl-end">10 km</span>
+      </div>
+      <div class="radius-value-display" id="radius-display">10,0 km</div>
+    </div>
+
+    <div id="map"></div>
+    <div class="map-hint-overlay" id="map-hint">Auf Karte klicken — Punkt setzen</div>
+
+    <div class="coord-status">
+      <div class="dot" id="status-dot-map"></div>
+      <span class="coords-text" id="coords-display">Noch kein Punkt gesetzt</span>
+    </div>
+
+    <div class="manual-input-bar">
+      <div class="m-label">Manuell</div>
+      <input type="text" id="gmaps-input" placeholder="Lat, Long  —  z.B. 49.01244, 12.03273 (aus Google Maps)" />
+      <button class="btn-parse" onclick="parseGMaps()">Setzen</button>
+    </div>
+
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <div class="section">
+      <div class="section-title">Kartenebene</div>
+      <div class="map-layer-row">
+        <button class="layer-btn" id="btn-osm" onclick="switchLayer('osm')">OpenStreetMap</button>
+        <button class="layer-btn active" id="btn-rail" onclick="switchLayer('rail')">OpenRailwayMap</button>
+      </div>
+    </div>
+
+    <div class="section" style="flex:1;">
+      <div class="section-title">
+        <span class="status-dot" id="status-dot"></span>Koordinaten für DiBa
+      </div>
+
+      <div class="diba-panel">
+
+        <!-- Panel header with hand-drawn funnel icon -->
+        <div class="diba-panel-header">
+
+          <!-- Funnel icon: blue square background, white funnel path — traced from the PNG -->
+          <div class="funnel-icon-wrap">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!--
+                Funnel shape:
+                Top trapezoid: wide at top, narrows to neck
+                Stem: narrow rectangle going down, with a slight notch at bottom-left corner
+              -->
+              <path d="
+                M1.5 2.5
+                L14.5 2.5
+                L9.5 8.0
+                L9.5 13.0
+                L8.5 13.8
+                L6.5 13.0
+                L6.5 8.0
+                Z
+              " fill="white"/>
+            </svg>
+          </div>
+
+          <span class="diba-badge">DiBa</span>
+          <span class="diba-title-text">Koordinaten für Geo-Daten Filter</span>
+        </div>
+
+        <!-- Filter rows -->
+        <div class="filter-rows">
+
+          <div class="filter-group-sep">Latitude</div>
+
+          <div class="filter-row">
+            <div class="field-name">LATITUDE</div>
+            <div class="operator">größer gleich</div>
+            <div class="coord-value empty" id="val-lat-min">—</div>
+            <button class="btn-copy" onclick="copyVal('val-lat-min', this)">Kopieren</button>
+          </div>
+
+          <div class="filter-row">
+            <div class="field-name">LATITUDE</div>
+            <div class="operator">kleiner gleich</div>
+            <div class="coord-value empty" id="val-lat-max">—</div>
+            <button class="btn-copy" onclick="copyVal('val-lat-max', this)">Kopieren</button>
+          </div>
+
+          <div class="filter-group-sep">Longitude</div>
+
+          <div class="filter-row">
+            <div class="field-name">LONGITUDE</div>
+            <div class="operator">größer gleich</div>
+            <div class="coord-value empty" id="val-long-min">—</div>
+            <button class="btn-copy" onclick="copyVal('val-long-min', this)">Kopieren</button>
+          </div>
+
+          <div class="filter-row">
+            <div class="field-name">LONGITUDE</div>
+            <div class="operator">kleiner gleich</div>
+            <div class="coord-value empty" id="val-long-max">—</div>
+            <button class="btn-copy" onclick="copyVal('val-long-max', this)">Kopieren</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const DEG2RAD = Math.PI / 180;
+let marker = null, boundingBox = null;
+let currentLat = null, currentLng = null;
+let currentRadius = 10000;
+
+const map = L.map('map', { zoomControl: true }).setView([49.1970791, 11.3597205], 10);
+const layers = {
+  osm: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors © CARTO', maxZoom: 19
+  }),
+  rail: L.tileLayer('https://tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors, © OpenRailwayMap', maxZoom: 19, opacity: 0.8
+  })
+};
+layers.osm.addTo(map);
+layers.rail.addTo(map);
+map.on('click', e => setLocation(e.latlng.lat, e.latlng.lng));
+
+function switchLayer(name) {
+  document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + name).classList.add('active');
+  if (name === 'osm') {
+    if (map.hasLayer(layers.rail)) map.removeLayer(layers.rail);
+    if (!map.hasLayer(layers.osm)) layers.osm.addTo(map);
+  } else {
+    if (!map.hasLayer(layers.osm)) layers.osm.addTo(map);
+    if (!map.hasLayer(layers.rail)) layers.rail.addTo(map);
+  }
+}
+
+const R_MIN = Math.log10(10), R_MAX = Math.log10(10000);
+function sliderToRadius(v) { return Math.round(Math.pow(10, R_MIN + (v / 100) * (R_MAX - R_MIN))); }
+function radiusToSlider(r) { return Math.round(((Math.log10(Math.max(10, Math.min(r, 10000))) - R_MIN) / (R_MAX - R_MIN)) * 100); }
+function formatRadius(r) { return r < 1000 ? r.toLocaleString('de-DE') + ' m' : (r / 1000).toLocaleString('de-DE', {maximumFractionDigits: 1}) + ' km'; }
+
+function onSliderChange(val) {
+  currentRadius = sliderToRadius(parseFloat(val));
+  document.getElementById('radius-display').textContent = formatRadius(currentRadius);
+  syncPresetHighlight(currentRadius);
+  recalculate();
+}
+
+function setRadius(r) {
+  currentRadius = r;
+  document.getElementById('radius-slider').value = radiusToSlider(r);
+  document.getElementById('radius-display').textContent = formatRadius(r);
+  syncPresetHighlight(r);
+  recalculate();
+}
+
+const PRESETS = [10, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+function syncPresetHighlight(r) {
+  document.querySelectorAll('.preset-btn').forEach((b, i) => b.classList.toggle('active', PRESETS[i] === r));
+}
+
+function setLocation(lat, lng) {
+  currentLat = lat; currentLng = lng;
+  if (marker) map.removeLayer(marker);
+  marker = L.circleMarker([lat, lng], {
+    radius: 7, color: '#e8542a', fillColor: '#e8542a', fillOpacity: 1, weight: 2
+  }).addTo(map);
+  document.getElementById('map-hint').classList.add('hidden');
+  document.getElementById('coords-display').textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+  document.getElementById('status-dot-map').classList.add('active');
+  document.getElementById('status-dot').classList.add('active');
+  recalculate();
+}
+
+function recalculate() {
+  if (currentLat === null) return;
+  const dLat = currentRadius / 111320;
+  const dLng = currentRadius / (111320 * Math.cos(currentLat * DEG2RAD));
+  const latMin = currentLat - dLat, latMax = currentLat + dLat;
+  const lngMin = currentLng - dLng, lngMax = currentLng + dLng;
+  setResult('val-lat-min', latMin);
+  setResult('val-lat-max', latMax);
+  setResult('val-long-min', lngMin);
+  setResult('val-long-max', lngMax);
+  if (boundingBox) map.removeLayer(boundingBox);
+  boundingBox = L.rectangle([[latMin, lngMin],[latMax, lngMax]], {
+    color: '#e8542a', weight: 2, fillColor: '#e8542a', fillOpacity: 0.08
+  }).addTo(map);
+  map.fitBounds([[latMin, lngMin],[latMax, lngMax]], { padding: [40, 40] });
+}
+
+function setResult(valId, val) {
+  const el = document.getElementById(valId);
+  el.textContent = val.toFixed(10).replace(/0+$/, '').replace(/\.$/, '');
+  el.classList.remove('empty');
+}
+
+function parseGMaps() {
+  const raw = document.getElementById('gmaps-input').value.trim();
+  const match = raw.match(/(-?\d+[\.,]\d+)[,;\s]+(-?\d+[\.,]\d+)/);
+  if (!match) { alert('Format nicht erkannt. Bitte "Lat, Long" eingeben, z.B. 49.01244, 12.03273'); return; }
+  const lat = parseFloat(match[1].replace(',', '.'));
+  const lng = parseFloat(match[2].replace(',', '.'));
+  map.setView([lat, lng], 14);
+  setLocation(lat, lng);
+}
+document.getElementById('gmaps-input').addEventListener('keydown', e => { if (e.key === 'Enter') parseGMaps(); });
+
+function copyVal(id, btn) {
+  const val = document.getElementById(id).textContent;
+  if (val === '—') return;
+  navigator.clipboard.writeText(val).then(() => {
+    btn.textContent = '✓ Kopiert';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Kopieren'; btn.classList.remove('copied'); }, 1500);
+  });
+}
+</script>
+</body>
+</html>
