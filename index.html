@@ -589,8 +589,8 @@ async function jumpToKm() {
   btn.disabled = true;
 
   // allorigins.win gibt JSON zurück: { contents: "<json-string>", status: {...} }
-  const apiUrl  = `https://api.openrailwaymap.org/v2/milestone?ref=${encodeURIComponent(strecke)}&position=${km}&limit=5`;
-  https://openrailapi.simon-lindermeir.workers.dev/?url=${encodeURIComponent(apiUrl)}`;
+  const apiUrl   = `https://api.openrailwaymap.org/v2/milestone?ref=${encodeURIComponent(strecke)}&position=${km}&limit=5`;
+const proxyUrl = `https://openrailapi.simon-lindermeir.workers.dev/?url=${encodeURIComponent(apiUrl)}`;
 
   try {
     const res = await fetch(proxyUrl);
