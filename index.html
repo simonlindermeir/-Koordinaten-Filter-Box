@@ -590,17 +590,17 @@ async function jumpToKm() {
 
   // allorigins.win gibt JSON zurück: { contents: "<json-string>", status: {...} }
   const apiUrl  = `https://api.openrailwaymap.org/v2/milestone?ref=${encodeURIComponent(strecke)}&position=${km}&limit=5`;
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
+  https://openrailapi.simon-lindermeir.workers.dev/?url=${encodeURIComponent(apiUrl)}`;
 
   try {
     const res = await fetch(proxyUrl);
     if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
-    const wrapper = await res.json();
 
     // allorigins liefert die eigentliche Antwort als String in wrapper.contents
+
     let data;
     try {
-      data = JSON.parse(wrapper.contents);
+      data = await res.json();
     } catch {
       throw new Error('Antwort konnte nicht geparst werden.');
     }
