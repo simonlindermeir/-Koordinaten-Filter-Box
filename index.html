@@ -565,8 +565,8 @@ function parseGMaps() {
 document.getElementById('gmaps-input').addEventListener('keydown', e => { if (e.key === 'Enter') parseGMaps(); });
 
 // ── Strecken-Navigation mit Interpolation ──
-// CORS-Umweg über allorigins.win — robuster als corsproxy.io
-async function jumpToKm() {
+
+ async function jumpToKm() {
   const strecke  = document.getElementById('inp-strecke').value.trim();
   const kmRaw    = document.getElementById('inp-km').value.trim();
   const statusEl = document.getElementById('strecke-status');
@@ -588,15 +588,13 @@ async function jumpToKm() {
   statusEl.textContent = `Suche km ${km} auf Strecke ${strecke} …`;
   btn.disabled = true;
 
-  // allorigins.win gibt JSON zurück: { contents: "<json-string>", status: {...} }
   const apiUrl   = `https://api.openrailwaymap.org/v2/milestone?ref=${encodeURIComponent(strecke)}&position=${km}&limit=5`;
-const proxyUrl = `https://openrailapi.simon-lindermeir.workers.dev/?url=${encodeURIComponent(apiUrl)}`;
+  const proxyUrl = `https://openrailapi.simon-lindermeir.workers.dev/?url=${encodeURIComponent(apiUrl)}`;
 
   try {
     const res = await fetch(proxyUrl);
     if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
 
-    // allorigins liefert die eigentliche Antwort als String in wrapper.contents
 
     let data;
     try {
